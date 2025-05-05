@@ -1,11 +1,25 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from products import products
+import json
+
+with open('products.json', 'r', encoding='utf-8') as file:
+    products = json.load(file)
+
+with open('outwear_products.json', 'r', encoding='utf-8') as file:
+    outerwears = json.load(file)
+
+with open('underwear_products.json', 'r', encoding='utf-8') as file:
+    underwears = json.load(file)
+
+with open('footwear_products.json', 'r', encoding='utf-8') as file:
+    footwears = json.load(file)
+
 
 ITEMS_PER_PAGE = 5
 
 main = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='Catalog')]
+    [KeyboardButton(text='Catalog')],
+    [KeyboardButton(text='Open Cart')]
 ], resize_keyboard=True)
 
 filter_buttons = InlineKeyboardMarkup(inline_keyboard=[
@@ -27,23 +41,6 @@ good_buttons = InlineKeyboardMarkup(inline_keyboard=[
 
 
 async def show_outerwear(page):
-    outerwears = []
-    for product in products:
-        if product['name'].lower().startswith('худі'):
-            outerwears.append(product)
-        elif product['name'].lower().startswith('світшот'):
-            outerwears.append(product)
-        elif product['name'].lower().startswith('футболка'):
-            outerwears.append(product)
-        elif product['name'].lower().startswith('куртка'):
-            outerwears.append(product)
-        elif product['name'].lower().startswith('пуховик'):
-            outerwears.append(product)
-        elif product['name'].lower().startswith('вітровка'):
-            outerwears.append(product)
-        elif product['name'].lower().startswith('бомбер'):
-            outerwears.append(product)
-
     keyboard = InlineKeyboardBuilder()
 
     start = page * ITEMS_PER_PAGE
@@ -51,7 +48,7 @@ async def show_outerwear(page):
     goods_slice = outerwears[start:end]
 
     for good in goods_slice:
-        keyboard.add(InlineKeyboardButton(text=good['name'], callback_data=f'good_{good["name"].split(" ")[-1]}'))
+        keyboard.add(InlineKeyboardButton(text=good['name'], callback_data=f'good_{good["id"]}'))
 
     keyboard.adjust(1)
 
@@ -69,13 +66,6 @@ async def show_outerwear(page):
 
 
 async def show_underwear(page):
-    underwears = []
-    for product in products:
-        if product['name'].lower().startswith('джинси'):
-            underwears.append(product)
-        elif product['name'].lower().startswith('шорти'):
-            underwears.append(product)
-
     keyboard = InlineKeyboardBuilder()
 
     start = page * ITEMS_PER_PAGE
@@ -83,7 +73,7 @@ async def show_underwear(page):
     goods_slice = underwears[start:end]
 
     for good in goods_slice:
-        keyboard.add(InlineKeyboardButton(text=good['name'], callback_data=f'good_{good["name"].split(" ")[-1]}'))
+        keyboard.add(InlineKeyboardButton(text=good['name'], callback_data=f'good_{good["id"]}'))
 
     keyboard.adjust(1)
 
@@ -101,15 +91,6 @@ async def show_underwear(page):
 
 
 async def show_footwear(page):
-    footwears = []
-    for product in products:
-        if product['name'].lower().startswith('кеди'):
-            footwears.append(product)
-        elif product['name'].lower().startswith('кросівки'):
-            footwears.append(product)
-        elif product['name'].lower().startswith('тапочки'):
-            footwears.append(product)
-
     keyboard = InlineKeyboardBuilder()
 
     start = page * ITEMS_PER_PAGE
@@ -117,7 +98,7 @@ async def show_footwear(page):
     goods_slice = footwears[start:end]
 
     for good in goods_slice:
-        keyboard.add(InlineKeyboardButton(text=good['name'], callback_data=f'good_{good["name"].split(" ")[-1]}'))
+        keyboard.add(InlineKeyboardButton(text=good['name'], callback_data=f'good_{good["id"]}'))
 
     keyboard.adjust(1)
 
@@ -143,7 +124,7 @@ async def show_all_goods(page):
     goods_slice = all_goods[start:end]
 
     for good in goods_slice:
-        keyboard.add(InlineKeyboardButton(text=good['name'], callback_data=f'good_{good["name"].split(" ")[-1]}'))
+        keyboard.add(InlineKeyboardButton(text=good['name'], callback_data=f'good_{good["id"]}'))
 
     keyboard.adjust(1)
 
@@ -158,3 +139,18 @@ async def show_all_goods(page):
         keyboard.row(*nav_buttons)
 
     return keyboard.as_markup()
+
+
+async def add_good_buttons(good_id):
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text='🛒 Add to cart', callback_data=f'add_to_cart_{good_id}')],
+            [InlineKeyboardButton(text='🔙 Back', callback_data='from_good_to_main')]
+        ]
+    )
+
+cart_buttons = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text='🏠', callback_data='to_main')],
+    ]
+)

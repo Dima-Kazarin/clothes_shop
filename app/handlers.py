@@ -1,12 +1,18 @@
-import requests
+import json
+import os
 from aiogram import F, Router
 from aiogram.filters import CommandStart
-from aiogram.types import InputMediaPhoto, InputFile, URLInputFile
+from aiogram.exceptions import TelegramNetworkError
 
 import app.keyboard as kb
-from products import products
 
 router = Router()
+CART_FILE = 'cart.json'
+
+file_path = 'products.json'
+
+with open(file_path, 'r', encoding='utf-8') as file:
+    products = json.load(file)
 
 
 @router.message(CommandStart())
@@ -57,19 +63,23 @@ async def show_footwear(callback):
 
 @router.callback_query(F.data.startswith('good_'))
 async def show_good_outerwear(callback):
-    await callback.message.delete()
+    try:
+        good_id = callback.data.split('_')[1]
+        good = next((product for product in products if product.get('id') == good_id), None)
 
-    good_id = callback.data.split('_')[1]
-    for product in products:
-        if product['name'].endswith(good_id):
-            good = product
+        if not good:
+            await callback.message.answer('❗ Product not found.')
+            return
 
-    message_text = f'{" ".join(good["name"].split(" ")[:-1])}\n'
-    message_text += f'Розміри: {", ".join(good["sizes"])}\n'
-    message_text += f'Ціна: {good["price"]}\n'
+        message_text = f'{good["name"]}\n'
+        message_text += f'Sizes: {", ".join(good["sizes"])}\n'
+        message_text += f'Price: {good["price"]}\n'
 
-    photo = URLInputFile(good['photo'])
-    await callback.message.answer_photo(photo, caption=message_text, reply_markup=kb.good_buttons)
+        photo = good["photo"]
+        await callback.message.answer_photo(photo, caption=message_text,
+                                            reply_markup=await kb.add_good_buttons(good_id))
+    except TelegramNetworkError:
+        await callback.message.answer("❗ Network issue. Please try again later.")
 
 
 @router.callback_query(F.data == 'all_goods')
@@ -99,3 +109,64 @@ async def paginate_underwear(callback):
 async def paginate_footwear(callback):
     page = int(callback.data.split('_')[1])
     await callback.message.edit_text('Select your footwear:', reply_markup=await kb.show_footwear(page=page))
+
+
+def add_to_cart(user_id, product):
+    cart_file = 'cart.json'
+
+    if os.path.exists(cart_file):
+        with open(cart_file, 'r', encoding='utf-8') as file:
+            cart = json.load(file)
+    else:
+        cart = []
+
+    user_cart = [item for item in cart if item['user_id'] == user_id]
+
+    for item in user_cart:
+        if item['id'] == product['id']:
+            item['quantity'] = item.get('quantity', 1) + 1
+            break
+    else:
+        product_copy = product.copy()
+        product_copy['quantity'] = 1
+        product_copy['user_id'] = user_id  
+        cart.append(product_copy)
+
+    with open(cart_file, 'w', encoding='utf-8') as file:
+        json.dump(cart, file, ensure_ascii=False, indent=4)
+
+
+@router.callback_query(F.data.startswith('add_to_cart_'))
+async def add_to_cart_handler(callback):
+    user_id = callback.from_user.id  
+    good_id = callback.data.split('_')[3]
+    product = next((p for p in products if p.get('id') == good_id), None)
+
+    if product:
+        add_to_cart(user_id, product)
+        await callback.answer('✅ Product added to cart!')
+    else:
+        await callback.answer('❌ Product not found.', show_alert=True)
+
+
+@router.message(F.text == 'Open Cart')
+async def open_cart_handler(message):
+    user_id = message.from_user.id
+    cart_file = 'cart.json'
+
+    if os.path.exists(cart_file):
+        with open(cart_file, 'r', encoding='utf-8') as file:
+            cart = json.load(file)
+    else:
+        cart = []
+
+    user_cart = [item for item in cart if item['user_id'] == user_id]
+
+    if not user_cart:
+        await message.answer("🛒 Your cart is empty.")
+
+    for product in user_cart:
+        caption = f'{product["name"]}\nPrice: {product["price"]}\nQuantity: {product["quantity"]}'
+        await message.answer(caption)
+
+    await message.answer("What next?", reply_markup=kb.cart_buttons)
